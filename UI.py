@@ -10,78 +10,8 @@ import shutil
 from PIL import Image
 from ultralytics import YOLO
 
-import mysql.connector
-from mysql.connector import Error
-
-# 数据库配置
-DB_CONFIG = {
-    "host": "localhost",
-    "user": "your_username",
-    "password": "your_password",
-    "database": "user_db"
-}
-
-XX = "基于YOLOv11的垃圾分类检测系统"
-YY = "YOLOv11"
-
-
-# 初始化数据库表
-def init_db():
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                username VARCHAR(255) PRIMARY KEY,
-                password VARCHAR(255) NOT NULL
-            )
-        ''')
-        conn.commit()
-    except Error as e:
-        st.error(f"数据库错误: {e}")
-    finally:
-        if conn.is_connected():
-            cursor.close()
-            conn.close()
-
-
-# 用户注册到数据库
-def register_user(username, password):
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)",
-                       (username, password))
-        conn.commit()
-        return True
-    except Error as e:
-        st.error(f"注册失败: {e}")
-        return False
-    finally:
-        if conn.is_connected():
-            cursor.close()
-            conn.close()
-
-
-# 验证用户登录
-def verify_user(username, password):
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-        cursor.execute("SELECT password FROM users WHERE username = %s", (username,))
-        result = cursor.fetchone()
-        return result is not None and result[0] == password
-    except Error as e:
-        st.error(f"登录验证失败: {e}")
-        return False
-    finally:
-        if conn.is_connected():
-            cursor.close()
-            conn.close()
-
-
-# 初始化数据库
-init_db()
+XX="基于YOLOv11垃圾分类检测系统"
+YY="YOLOv11"
 
 # 设置页面配置
 st.set_page_config(
@@ -90,24 +20,24 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+
 # 初始化会话状态
+if 'users' not in st.session_state:
+    st.session_state.users = {}
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # 登录和注册界面
 if not st.session_state.logged_in:
     tab1, tab2 = st.tabs(["登录", "注册"])
-
     with tab1:
         st.header("用户登录")
         username = st.text_input("用户名")
         password = st.text_input("密码", type="password")
         if st.button("登录"):
-            if verify_user(username, password):
+            if username in st.session_state.users and st.session_state.users[username] == password:
                 st.session_state.logged_in = True
-                st.session_state.username = username
                 st.success("登录成功！")
-                st.experimental_rerun()
             else:
                 st.error("用户名或密码错误！")
 
@@ -117,17 +47,18 @@ if not st.session_state.logged_in:
         new_password = st.text_input("新密码", type="password")
         confirm_password = st.text_input("确认密码", type="password")
         if st.button("注册"):
-            if new_password != confirm_password:
+            if new_username in st.session_state.users:
+                st.error("该用户名已存在，请选择其他用户名！")
+            elif new_password != confirm_password:
                 st.error("两次输入的密码不一致，请重新输入！")
             else:
-                if register_user(new_username, new_password):
-                    st.success("注册成功，请登录！")
+                st.session_state.users[new_username] = new_password
+                st.success("注册成功，请登录！")
     st.stop()
 
 # 主界面布局
 st.title(XX)
-st.markdown(f"欢迎 {st.session_state.username}！")
-st.markdown("上传图片、视频和" + YY + "模型权重文件进行目标检测")
+st.markdown("上传图片、视频和"+YY+"模型权重文件进行目标检测")
 
 # 初始化会话状态变量
 if 'model' not in st.session_state:
@@ -332,7 +263,7 @@ class YOLOv8Detector:
 
 # 侧边栏配置
 st.sidebar.header("模型设置")
-uploaded_weights = st.sidebar.file_uploader("上传" + YY + "权重文件", type=["pt"])
+uploaded_weights = st.sidebar.file_uploader("上传"+YY+"权重文件", type=["pt"])
 
 # 模型参数
 img_size = st.sidebar.slider("图像尺寸", 320, 1280, 640, 32)

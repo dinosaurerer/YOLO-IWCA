@@ -6,7 +6,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 if __name__ == '__main__':
-    workers = 8
+    workers = 0
     batch = 16
     data_name = "yolov8"
     data_path = 'data.yaml'
@@ -53,7 +53,7 @@ if __name__ == '__main__':
             device=device,  # 训练设备 (cuda/cpu)
             workers=workers,  # 数据加载的工作线程数
             imgsz=imgsz,  # 训练图像尺寸
-            epochs=100,  # 训练周期数，通用设置100-300
+            epochs=1,  # 训练周期数，通用设置100-300
             patience=20,  # 早停耐心值，连续20个周期没有改进则停止
             batch=batch,  # 批次大小
             optimizer='AdamW',  # 优化器选择 (SGD/Adam/AdamW)
