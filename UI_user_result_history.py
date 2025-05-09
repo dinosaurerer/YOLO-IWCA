@@ -154,44 +154,26 @@ if 'current_weights' not in st.session_state:
     st.session_state.current_weights = None
 
 
-def convert_video_to_compatible_format(input_path, output_path):
-    """
-    使用OpenCV重新编码视频以确保兼容性
-    """
-    try:
-        # 打开输入视频
-        cap = cv2.VideoCapture(input_path)
-        if not cap.isOpened():
-            return False, "无法打开视频文件"
+def convert_to_h264_opencv(input_path):
+    output_path = input_path.replace(".mp4", "_converted.mp4")
+    cap = cv2.VideoCapture(input_path)
+    fourcc = cv2.VideoWriter_fourcc(*'avc1')  # H.264 编码
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        # 获取视频属性
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        if fps < 1:  # 如果fps异常低，设置一个合理的默认值
-            fps = 25.0
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
-        # 创建VideoWriter对象
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        out.write(frame)
 
-        # 逐帧处理
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            # 写入帧
-            out.write(frame)
-
-        # 释放资源
-        cap.release()
-        out.release()
-
-        return True, "视频转换成功"
-    except Exception as e:
-        return False, f"视频转换失败: {str(e)}"
-
+    cap.release()
+    out.release()
+    print(f"视频流转换完成: {output_path}")
+    return output_path
 
 class YOLOv8Detector:
     def __init__(self, model_path=None, img_size=640, conf_thres=0.25, iou_thres=0.45):
@@ -254,42 +236,15 @@ class YOLOv8Detector:
             return None, "请先加载模型!"
 
         try:
-            # 首先确保输入视频是兼容格式
-            compatible_input = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4').name
-            success, message = convert_video_to_compatible_format(video_path, compatible_input)
-
-            if not success:
-                return None, message
-
-            # 使用兼容格式的视频进行处理
-            cap = cv2.VideoCapture(compatible_input)
-            if not cap.isOpened():
-                return None, "无法打开视频文件"
-
+            cap = cv2.VideoCapture(video_path)
             fps = cap.get(cv2.CAP_PROP_FPS)
-            if fps < 1:  # 如果fps异常低，设置一个合理的默认值
-                fps = 25.0
-
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-            # 创建临时输出文件
-            output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-            output_path = output_file.name
-            output_file.close()
-
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            output_path = video_path.replace(".mp4", "_output.mp4")
+            st.write(f"输出视频路径: {output_path}")
             out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-
-            frame_count = 0
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            if total_frames <= 0:
-                # 如果无法获取总帧数，则估算一个值
-                total_frames = 1000
-                st.warning("无法确定视频总帧数，使用估计值进行进度显示")
-
-            progress_bar = st.progress(0)
-            status_text = st.empty()
 
             while cap.isOpened():
                 ret, frame = cap.read()
@@ -304,46 +259,12 @@ class YOLOv8Detector:
                     device=self.device
                 )
 
-                annotated_frame = results[0].plot()
-                out.write(annotated_frame)
-
-                frame_count += 1
-                progress = min(frame_count / total_frames, 1.0)  # 确保不超过1.0
-                progress_bar.progress(progress)
-                status_text.text(f"处理进度: {frame_count}/{total_frames} 帧")
+                result_img = results[0].plot()
+                out.write(result_img)
 
             cap.release()
             out.release()
-
-            # 清理临时转换文件
-            if os.path.exists(compatible_input):
-                os.unlink(compatible_input)
-
-            progress_bar.empty()
-            status_text.text("视频处理完成！")
-
-            # 确保视频被正确编码，可以考虑使用ffmpeg进行最终处理
-            final_output = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4').name
-            try:
-                # 如果系统安装了ffmpeg，使用ffmpeg重新编码确保兼容性
-                subprocess.run([
-                    'ffmpeg', '-y', '-i', output_path,
-                    '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
-                    '-movflags', '+faststart', final_output
-                ], check=True, stderr=subprocess.PIPE)
-
-                # 如果ffmpeg成功，使用重新编码的视频
-                if os.path.exists(final_output) and os.path.getsize(final_output) > 0:
-                    if os.path.exists(output_path):
-                        os.unlink(output_path)
-                    return final_output, None
-            except (subprocess.SubprocessError, FileNotFoundError):
-                # 如果ffmpeg失败或不存在，继续使用原始输出
-                if os.path.exists(final_output):
-                    os.unlink(final_output)
-
             return output_path, None
-
         except Exception as e:
             return None, f"视频处理失败: {str(e)}"
 
@@ -559,6 +480,7 @@ with tab2:
             else:
                 start_time = time.time()
                 processed_path, error = st.session_state.model.process_video(temp_video_path)
+                out_put = convert_to_h264_opencv(processed_path)
                 elapsed_time = time.time() - start_time
 
                 if processed_path:
@@ -566,15 +488,17 @@ with tab2:
 
                     # 尝试使用Streamlit的原生视频播放器
                     try:
-                        with open(processed_path, "rb") as f:
+                        with open(out_put, "rb") as f:
                             video_bytes = f.read()
-                        st.video(video_bytes)
+                            st.video(video_bytes)
+                            st.write("Streamlit视频播放器成功播放处理后的视频。")
                     except Exception as video_error:
                         st.error(f"视频播放失败: {str(video_error)}")
                         st.warning("处理后的视频可能格式不兼容Streamlit播放器，但处理成功。请在应用外查看视频文件。")
 
                         # 提供下载链接作为备选方案
-                        with open(processed_path, "rb") as f:
+                        with open(out_put, "rb") as f:
+                            st.write("处理后的视频下载链接:")
                             video_bytes = f.read()
                         st.download_button(
                             label="下载处理后的视频",
@@ -586,11 +510,9 @@ with tab2:
                     # 清理临时文件
                     try:
                         os.unlink(temp_video_path)
-                        os.unlink(processed_path)
+                        os.unlink(out_put)
                     except:
                         pass  # 忽略清理错误
-                elif error:
-                    st.error(error)
 with tab3:
     history_query()
 
