@@ -1,0 +1,12 @@
+# Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
+path: ../datasets/rubbish/rubbish # dataset root dir
+train: images/train # train images (relative to 'path') 128 images
+val: images/val # val images (relative to 'path') 128 images
+test: # test images (optional)
+nc: 7
+# Classes
+names:
+  0: recyclable waste
+  1: hazardous waste
+  2: kitchen waste
+  3: other waste
