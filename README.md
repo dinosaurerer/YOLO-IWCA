@@ -172,7 +172,7 @@ A: 请确认是否允许浏览器/系统访问摄像头，建议使用桌面版�
 
 如果你喜欢本项目或有改进建议，欢迎联系我：
 
-* 📧 Email: [dinosaurerer@love.com](konglongxiao723@gmail.com)
+* 📧 Email: [dinosaurerer@love.com](mailto:konglongxiao723@gmail.com)
 * 💻 GitHub: [@dinosaurerer](https://github.com/dinosaurerer/YOLO-IWCA)
 
 ---
@@ -180,6 +180,6 @@ A: 请确认是否允许浏览器/系统访问摄像头，建议使用桌面版�
 <div align="center">
     <b>🌿 让 AI 帮助城市更清洁 🌿</b>
 </div>
-```
+
 
 ---
