@@ -15,6 +15,9 @@ import mysql.connector
 from mysql.connector import Error
 import pandas as pd
 
+
+
+
 # 数据库配置
 DB_CONFIG = {
     "host": "localhost",
@@ -45,7 +48,6 @@ def init_db():
         if conn.is_connected():
             cursor.close()
             conn.close()
-
 
 # 用户注册到数据库
 def register_user(username, password):
