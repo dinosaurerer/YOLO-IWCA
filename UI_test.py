@@ -100,15 +100,70 @@ def verify_user(username, password):
             conn.close()
 
 
-# 初始化数据库
-init_db()
-
-# 设置页面配置
+# 页面配置必须最前面
 st.set_page_config(
     page_title=XX,
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# 启动画面显示
+splash_placeholder = st.empty()
+with splash_placeholder.container():
+    st.markdown("""
+        <style>
+            .splash-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 90vh;
+                background-color: #E8F5E9;
+                font-family: "Segoe UI", sans-serif;
+            }
+            .splash-title {
+                font-size: 38px;
+                font-weight: bold;
+                color: #2E7D32;
+                margin-bottom: 10px;
+            }
+            .splash-sub {
+                font-size: 18px;
+                color: #388E3C;
+                margin-bottom: 20px;
+            }
+            .loader {
+                border: 6px solid #C8E6C9;
+                border-top: 6px solid #388E3C;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
+
+        <div class="splash-container">
+            <div class="splash-title">YOLOv11 垃圾分类检测系统</div>
+            <div class="splash-sub">正在启动，请稍候...</div>
+            <div class="loader"></div>
+        </div>
+    """, unsafe_allow_html=True)
+
+import time
+time.sleep(1.5)
+
+# ✅ 清除启动动画
+splash_placeholder.empty()
+
+
+# 初始化数据库
+init_db()
+
+
 
 
 # 美化样式注入
@@ -451,7 +506,7 @@ if uploaded_weights and (uploaded_weights != st.session_state.current_weights):
         st.session_state.model = None
 
 # 主内容区域
-tab1, tab2, tab3 = st.tabs(["图像检测", "视频检测", "历史记录查询"])
+tab1, tab2, tab3, tab4 = st.tabs(["图像检测", "视频检测", "摄像头检测", "历史记录查询"])
 
 with tab1:
     st.markdown("<div class='section-title'>图像检测 📷</div>", unsafe_allow_html=True)
@@ -474,6 +529,7 @@ with tab1:
 
                 if result_img is not None:
                     with col2:
+                        result_img = cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB)
                         st.image(result_img, caption="检测结果", use_container_width=True)
                         st.success(f"检测完成！耗时: {elapsed_time:.2f}秒")
 
@@ -568,7 +624,54 @@ with tab2:
 
 # 自定义分隔线（插入在模块之间）
 st.markdown("<hr class='custom-hr'>", unsafe_allow_html=True)
+
 with tab3:
+    st.markdown("<div class='section-title'>摄像头检测 🎥</div>", unsafe_allow_html=True)
+    st.markdown("请确保您的设备已连接摄像头，建议使用桌面版运行此功能。")
+
+    run_cam = st.checkbox("启用摄像头实时检测")
+    FRAME_WINDOW = st.empty()
+
+    if run_cam:
+        if st.session_state.model is None:
+            st.error("请先加载模型！")
+        else:
+            cap = cv2.VideoCapture(0)
+            detector = st.session_state.model
+
+            st.info("摄像头已启用，点击取消勾选以停止运行。")
+
+            while run_cam:
+                ret, frame = cap.read()
+                if not ret:
+                    st.warning("无法读取摄像头画面")
+                    break
+
+                # OpenCV 读取为 BGR，需要转换为 RGB 供模型输入
+                frame_rgb = frame
+
+                # 模型预测（注意：Ultralytics 的 YOLO 支持 numpy RGB 图像输入）
+                results = detector.model.predict(
+                    source=frame_rgb,
+                    imgsz=detector.img_size,
+                    conf=detector.conf_thres,
+                    iou=detector.iou_thres,
+                    device=detector.device
+                )
+
+                # 获取检测结果并绘制（OpenCV画框是BGR）
+                result_img = results[0].plot()
+
+                # 再次转换为 RGB 用于 st.image 显示
+                result_rgb = cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB)
+
+                # 显示在页面上
+                FRAME_WINDOW.image(result_rgb)
+
+            cap.release()
+
+
+with tab4:
     history_query()
 
 # 设备信息
