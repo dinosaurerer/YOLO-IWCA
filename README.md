@@ -1,5 +1,9 @@
 
+<div align="center">
+
 # ♻️ YOLOv11 垃圾分类检测系统
+
+</div>
 
 基于 Streamlit + YOLOv11 + OpenCV + MySQL 构建的智能垃圾检测平台，支持图像、视频、摄像头实时检测，并提供历史结果查询与模型管理功能。
 
@@ -72,7 +76,7 @@ mysql-connector-python
 
 #### 修改数据库连接信息：
 
-在 `UI_user_result_history.py` 中配置：
+在 `UI.py` 中配置：
 
 ```python
 DB_CONFIG = {
@@ -96,7 +100,7 @@ CREATE DATABASE dbwaste;
 ### 3️⃣ 启动应用
 
 ```bash
-streamlit run UI_user_result_history.py
+streamlit run UI.py
 ```
 
 ---
@@ -132,7 +136,7 @@ streamlit run UI_user_result_history.py
 
 ```
 yolov11-trash-detect/
-├── UI_user_result_history.py      # 主应用脚本
+├── UI.py      # 主应用脚本
 ├── requirements.txt               # 所需依赖
 ├── README.md                      # 使用文档
 ├── screenshots/                   # 截图资源
@@ -141,7 +145,8 @@ yolov11-trash-detect/
 
 ---
 
-## 💡 常见问题 FAQ
+## 💡 常见问题 FAQ  
+<small>我们团队在项目开发时遇到的一些问题</small>  
 
 ### Q1: 启动时为什么看到“启动动画”反复出现？
 
