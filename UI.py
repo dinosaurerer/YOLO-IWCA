@@ -633,7 +633,12 @@ st.markdown("<hr class='custom-hr'>", unsafe_allow_html=True)
 
 with tab3:
     st.markdown("<div class='section-title'>摄像头检测 🎥</div>", unsafe_allow_html=True)
-    st.markdown("请确保您的设备已连接摄像头，建议使用桌面版运行此功能。")
+    st.markdown("请确保您的设备或 RTSP 摄像头已连接并允许访问。")
+
+    cam_mode = st.radio("选择摄像头类型", ["本地摄像头", "RTSP 网络摄像头"])
+    rtsp_url = ""
+    if cam_mode == "RTSP 网络摄像头":
+        rtsp_url = st.text_input("请输入 RTSP 地址", placeholder="如 rtsp://admin:1234@192.168.5.30:8554/live")
 
     run_cam = st.checkbox("启用摄像头实时检测")
     FRAME_WINDOW = st.empty()
@@ -642,18 +647,25 @@ with tab3:
         if st.session_state.model is None:
             st.error("请先加载模型！")
         else:
-            cap = cv2.VideoCapture(0)
-            detector = st.session_state.model
+            # 初始化摄像头
+            if cam_mode == "本地摄像头":
+                cap = cv2.VideoCapture(0)
+            else:
+                if not rtsp_url.strip():
+                    st.warning("请填写有效的 RTSP 地址")
+                    st.stop()
+                cap = cv2.VideoCapture(rtsp_url)
 
+            detector = st.session_state.model
             st.info("摄像头已启用，点击取消勾选以停止运行。")
 
             while run_cam:
                 ret, frame = cap.read()
                 if not ret:
-                    st.warning("无法读取摄像头画面")
+                    st.warning("无法读取摄像头画面（请检查连接）")
                     break
 
-                # OpenCV 读取为 BGR，需要转换为 RGB 供模型输入
+                # 模型输入为 RGB 格式
                 frame_rgb = frame
 
                 # 模型预测
@@ -665,13 +677,10 @@ with tab3:
                     device=detector.device
                 )
 
-                # 获取检测结果并绘制（OpenCV画框是BGR）
+                # 获取检测结果图像
                 result_img = results[0].plot()
-
-                # 再次转换为 RGB 用于 st.image 显示
                 result_rgb = cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB)
 
-                # 显示在页面上
                 FRAME_WINDOW.image(result_rgb)
 
             cap.release()
