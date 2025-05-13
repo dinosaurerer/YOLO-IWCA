@@ -28,7 +28,7 @@
 - 🧠 加载自定义 YOLOv11 模型权重 `.pt`
 - 🖼️ 图像检测（实时展示目标框与类别）
 - 🎞️ 视频检测（自动转码，支持播放与下载）
-- 🎥 摄像头检测（本地实时推理）
+- 🎥 摄像头检测（本地实时推理）(待实现)
 - 📦 检测结果写入数据库，支持：
   - 日期筛选
   - 类别筛选
@@ -44,8 +44,8 @@
 ### 1️⃣ 安装依赖环境
 
 ```bash
-git clone https://github.com/yourname/yolov11-trash-detect.git
-cd yolov11-trash-detect
+git clone https://github.com/dinosaurerer/YOLO-IWCA.git
+cd YOLO-IWCA
 
 # 建议使用虚拟环境
 python -m venv venv
@@ -55,7 +55,7 @@ pip install -r requirements.txt
 ````
 
 <details>
-<summary>📄 requirements.txt 示例</summary>
+<summary>📄 requirements.txt </summary>
 
 ```txt
 streamlit
@@ -135,12 +135,18 @@ streamlit run UI.py
 ## 📂 项目结构说明
 
 ```
-yolov11-trash-detect/
-├── UI.py      # 主应用脚本
+YOLO-IWCA/
+├── UI.py                          # 主应用脚本
+├── train.py                       # 模型训练脚本
+├── data.yaml                      # 数据集配置文件
+├── getvideo.py                    # 视频处理脚本
 ├── requirements.txt               # 所需依赖
 ├── README.md                      # 使用文档
 ├── screenshots/                   # 截图资源
-└── weights/                       # 示例模型权重（可选）
+│   ├── s1.png                     # 系统主界面
+├── ultralytics                    # YOLOv11 依赖
+├── videodata/                     # 视频数据集(用于合成视频) 
+└── weights/                       # 示例模型权重
 ```
 
 ---
