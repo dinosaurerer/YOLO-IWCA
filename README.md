@@ -95,12 +95,23 @@ CREATE DATABASE dbwaste;
 
 系统将自动创建 `users` 表和用户专属的 `results_用户名` 检测结果表。
 
+#### cmd中启动sql连接服务：
+```bash
+net start mysql
+```
+
 ---
 
 ### 3️⃣ 启动应用
 
 ```bash
 streamlit run UI.py
+```
+
+### 4️⃣ 关闭应用
+
+```bash
+在终端中按 Ctrl + C
 ```
 
 ---
