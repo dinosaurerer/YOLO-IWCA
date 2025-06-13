@@ -1,5 +1,0 @@
-path: D:\edge安装\yolo模板\teaching\teaching\rubbish
-train: images/train
-val: images/val
-nc: 4
-names: ['recyclable waste', 'hazardous waste', 'kitchen waste', 'other waste']

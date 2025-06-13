@@ -15,6 +15,9 @@ from mysql.connector import Error
 import pandas as pd
 import time
 
+import pyttsx3
+from collections import Counter
+
 # 数据库配置
 DB_CONFIG = {
     "host": "localhost",
@@ -95,6 +98,36 @@ def verify_user(username, password):
         if conn.is_connected():
             cursor.close()
             conn.close()
+# 初始化语音引擎
+
+engine = pyttsx3.init()
+engine.setProperty('rate', 160)
+engine.setProperty('volume', 1.0)
+
+# 分类提示映射
+TRASH_HINTS = {
+    "recyclable waste": {"tip": "请投放至蓝色可回收垃圾桶。", "color": "蓝色 ♻️"},
+    "hazardous waste": {"tip": "请投放至红色有害垃圾桶。", "color": "红色 ☣️"},
+    "kitchen waste": {"tip": "请投放至绿色厨余垃圾桶。", "color": "绿色 🥦"},
+    "other waste": {"tip": "请投放至灰色其他垃圾桶。", "color": "灰色 🗑️"}
+}
+import threading
+# 异步语音播报函数，避免阻塞和 run loop 冲突
+tts_lock = threading.Lock()
+
+
+def speak_trash_tip(text):
+    def _speak():
+        with tts_lock:
+            try:
+                # 使用全局引擎实例
+                engine.say(text)
+                engine.runAndWait()
+            except RuntimeError:
+                engine.endLoop()
+
+    if not engine._inLoop:  # 防止重复启动事件循环
+        threading.Thread(target=_speak, daemon=True).start()
 
 
 # 页面配置必须最先
@@ -641,7 +674,10 @@ with tab3:
         rtsp_url = st.text_input("请输入 RTSP 地址", placeholder="如 rtsp://admin:1234@192.168.5.30:8554/live")
 
     run_cam = st.checkbox("启用摄像头实时检测")
+    voice_on = st.checkbox("🔊 启用语音提示", value=True)
+
     FRAME_WINDOW = st.empty()
+    tip_placeholder = st.empty()
 
     if run_cam:
         if st.session_state.model is None:
@@ -659,31 +695,52 @@ with tab3:
             detector = st.session_state.model
             st.info("摄像头已启用，点击取消勾选以停止运行。")
 
+            # 使用 session_state 持久化 last_spoken_classes
+            if "last_spoken_classes" not in st.session_state:
+                st.session_state.last_spoken_classes = set()
+
             while run_cam:
                 ret, frame = cap.read()
                 if not ret:
                     st.warning("无法读取摄像头画面（请检查连接）")
                     break
 
-                # 模型输入为 RGB 格式
-                frame_rgb = frame
-
-                # 模型预测
                 results = detector.model.predict(
-                    source=frame_rgb,
+                    source=frame,
                     imgsz=detector.img_size,
                     conf=detector.conf_thres,
                     iou=detector.iou_thres,
                     device=detector.device
                 )
 
-                # 获取检测结果图像
                 result_img = results[0].plot()
                 result_rgb = cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB)
-
                 FRAME_WINDOW.image(result_rgb)
 
-            cap.release()
+                detected_classes = [detector.model.names[int(box.cls)] for box in results[0].boxes]
+                current_classes = set(detected_classes)
+
+                # 动态更新语音提示状态
+                if "last_spoken_classes" not in st.session_state:
+                    st.session_state.last_spoken_classes = set()
+
+                new_classes = current_classes - st.session_state.last_spoken_classes
+                removed_classes = st.session_state.last_spoken_classes - current_classes
+
+                # 播报新出现的类别
+                if voice_on and new_classes:
+                    for cls in new_classes:
+                        speak_trash_tip(TRASH_HINTS[cls]["tip"])
+
+                # 实时更新当前检测状态
+                st.session_state.last_spoken_classes = current_classes.copy()
+
+                # 显示提示信息
+                tip_texts = [f"**{cls}** → {TRASH_HINTS[cls]['color']}" for cls in current_classes]
+                tip_placeholder.markdown("### 📢 当前检测垃圾分类：<br>" + '<br>'.join(tip_texts) if tip_texts else "",
+                                         unsafe_allow_html=True)
+
+
 
 with tab4:
     history_query()
