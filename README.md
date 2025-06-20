@@ -187,24 +187,28 @@ streamlit run UI.py
 ```
 YOLO-IWCA/
 ├── UI.py                          # 主界面脚本，运行后启动智能垃圾分类助手的图形界面
-├── getvideo.py                    # 视频处理脚本，从videodata目录读取视频帧并生成处理后的视频
-├── output_video.mp4               # 处理后的示例视频输出结果
-├── Intelligent Waste Classification Assistant.pdf  # 项目说明书或展示文档
+├── demo_video.mp4                 # 示例视频，可用于视频检测功能测试
+├── train.ipynb                    # YOLOv11 模型训练脚本
 ├── README.md                      # 项目使用说明文档
 ├── screenshots/                   # 系统界面截图资源
 │   └── s1.png                     # 示例截图（主界面）
 ├── test/                          # 测试文件夹
 ├── ultralytics/                   # YOLOv11 模型依赖（添加MSCA-attention）
-├── videodata/                     # 视频帧图片数据目录
-│   ├── fimg_228.jpg
-│   ├── fimg_234.jpg
-│   ├── ...
-│   └── fimg_242.jpg
 ├── weights/                       # 模型权重目录
-│   ├── yolo11-365-noaug.pt        # 自训练的 YOLOv11 模型权重（无数据增强）
-│   ├── yolo11n.pt                 # YOLOv11 nano 模型权重
-│   └── yolov8n.pt                 # YOLOv8 nano 模型权重（可对比测试）
-├── project documentation/            # 项目文档目录
+│   ├── yolo11m-318-noaug.pt       # 自训练的 YOLOv11 模型权重（无数据增强）
+│   ├── yolo11m-420-aug.pt         # YOLOv11 medium 模型权重（带数据增强）
+│   └── yolo11s-620-aug.pt         # YOLOv11 small 模型权重（带数据增强）
+├── project documentation/         # 项目文档目录
+├── font/                          # 字体资源目录
+├── tools/                         # 工具脚本目录
+│   ├── clearall.py                # 清理临时文件的工具
+│   ├── extract_video_frames.py    # 视频帧提取工具
+│   ├── filter_and_copy_images.py  # 图像筛选与复制工具
+│   ├── getvideo.py                # 视频获取工具
+│   └── split.py                   # 数据集分割工具
+├── videodata/                     # 视频数据存储目录
+└── train.ipynb                    # 模型训练笔记本文件（Jupyter Notebook）
+
 ```
 
 ---
