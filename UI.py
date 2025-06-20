@@ -15,8 +15,10 @@ from mysql.connector import Error
 import pandas as pd
 import time
 
-import pyttsx3
 from collections import Counter
+
+from PIL import ImageFont, ImageDraw, Image
+
 
 # 数据库配置
 DB_CONFIG = {
@@ -29,6 +31,13 @@ DB_CONFIG = {
 XX = "基于YOLOv11的垃圾分类检测系统"
 YY = "YOLOv11"
 
+# 分类提示映射
+TRASH_HINTS = {
+    "recyclable_waste": {"tip": "请投放至蓝色可回收垃圾桶。", "color": "蓝色 ♻️"},
+    "hazardous_waste": {"tip": "请投放至红色有害垃圾桶。", "color": "红色 ☣️"},
+    "kitchen_waste": {"tip": "请投放至绿色厨余垃圾桶。", "color": "绿色 🥦"},
+    "other_waste": {"tip": "请投放至灰色其他垃圾桶。", "color": "灰色 🗑️"}
+}
 
 # 初始化数据库表
 def init_db():
@@ -38,7 +47,8 @@ def init_db():
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 username VARCHAR(255) PRIMARY KEY,
-                password VARCHAR(255) NOT NULL
+                password VARCHAR(255) NOT NULL,
+                is_admin BOOLEAN DEFAULT FALSE
             )
         ''')
         conn.commit()
@@ -51,11 +61,12 @@ def init_db():
 
 
 # 用户注册到数据库
-def register_user(username, password):
+def register_user(username, password,is_admin=False):
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, password))
+        cursor.execute("INSERT INTO users (username, password, is_admin) VALUES (%s, %s, %s)",
+            (username, password, is_admin))
         conn.commit()
 
         # 创建用户专属的检测结果表
@@ -88,46 +99,20 @@ def verify_user(username, password):
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         cursor = conn.cursor()
-        cursor.execute("SELECT password FROM users WHERE username = %s", (username,))
+        cursor.execute("SELECT password, is_admin FROM users WHERE username = %s", (username,))
         result = cursor.fetchone()
-        return result is not None and result[0] == password
+        if result and result[0] == password:
+            return {"is_admin": result[1]}
+        return None
     except Error as e:
         st.error(f"登录验证失败: {e}")
-        return False
+        return None
     finally:
         if conn.is_connected():
             cursor.close()
             conn.close()
-# 初始化语音引擎
-
-engine = pyttsx3.init()
-engine.setProperty('rate', 160)
-engine.setProperty('volume', 1.0)
-
-# 分类提示映射
-TRASH_HINTS = {
-    "recyclable waste": {"tip": "请投放至蓝色可回收垃圾桶。", "color": "蓝色 ♻️"},
-    "hazardous waste": {"tip": "请投放至红色有害垃圾桶。", "color": "红色 ☣️"},
-    "kitchen waste": {"tip": "请投放至绿色厨余垃圾桶。", "color": "绿色 🥦"},
-    "other waste": {"tip": "请投放至灰色其他垃圾桶。", "color": "灰色 🗑️"}
-}
-import threading
-# 异步语音播报函数，避免阻塞和 run loop 冲突
-tts_lock = threading.Lock()
 
 
-def speak_trash_tip(text):
-    def _speak():
-        with tts_lock:
-            try:
-                # 使用全局引擎实例
-                engine.say(text)
-                engine.runAndWait()
-            except RuntimeError:
-                engine.endLoop()
-
-    if not engine._inLoop:  # 防止重复启动事件循环
-        threading.Thread(target=_speak, daemon=True).start()
 
 
 # 页面配置必须最先
@@ -250,14 +235,21 @@ if not st.session_state.logged_in:
 
     with tab1:
         st.header("用户登录")
+        login_type = st.radio("登录身份", ["普通用户", "管理员"], horizontal=True)
         username = st.text_input("用户名")
         password = st.text_input("密码", type="password")
         if st.button("登录"):
-            if verify_user(username, password):
-                st.session_state.logged_in = True
-                st.session_state.username = username
-                st.success("登录成功！")
-                st.rerun()
+            user_info = verify_user(username, password)
+            if user_info:
+                if (login_type == "管理员" and user_info["is_admin"]) or (
+                        login_type == "普通用户" and not user_info["is_admin"]):
+                    st.session_state.logged_in = True
+                    st.session_state.username = username
+                    st.session_state.is_admin = user_info["is_admin"]
+                    st.success("登录成功！")
+                    st.rerun()
+                else:
+                    st.error("登录身份与账号权限不匹配！")
             else:
                 st.error("用户名或密码错误！")
 
@@ -266,12 +258,14 @@ if not st.session_state.logged_in:
         new_username = st.text_input("新用户名")
         new_password = st.text_input("新密码", type="password")
         confirm_password = st.text_input("确认密码", type="password")
+        is_admin = st.checkbox("注册为管理员")  # 新增
         if st.button("注册"):
             if new_password != confirm_password:
                 st.error("两次输入的密码不一致，请重新输入！")
             else:
-                if register_user(new_username, new_password):
+                if register_user(new_username, new_password, is_admin=is_admin):
                     st.success("注册成功，请登录！")
+
     st.stop()
 
 # 主界面布局
@@ -325,6 +319,7 @@ class YOLOv8Detector:
             self.model = YOLO(model_path)
             self.model.to(self.device)
             self.names = self.model.names
+            print(self.names)
             return True, "模型加载成功!"
         except Exception as e:
             return False, f"模型加载失败: {str(e)}"
@@ -412,13 +407,21 @@ def history_query():
 
     st.markdown("**提示：** 在此查询您的历史检测记录，可根据日期范围、文件名和类别进行筛选。")
     username = st.session_state["username"]
-    table_name = f"results_{username}"
+    is_admin = st.session_state.get("is_admin", False)
 
     # 连接数据库
     conn = mysql.connector.connect(**DB_CONFIG)
     if not conn:
         return
     cursor = conn.cursor()
+
+    if is_admin:
+        cursor.execute("SELECT username FROM users")
+        user_list = [row[0] for row in cursor.fetchall()]
+        selected_user = st.selectbox("选择用户查看其历史记录", user_list)
+        table_name = f"results_{selected_user}"
+    else:
+        table_name = f"results_{username}"
 
     # 获取类别选项（供筛选使用）
     class_options = []
@@ -491,7 +494,7 @@ def history_query():
             st.download_button(
                 label="下载CSV",
                 data=csv,
-                file_name=f"{username}_history.csv",
+                file_name=f"{selected_user if is_admin else username}_history.csv",
                 mime="text/csv"
             )
         else:
@@ -674,7 +677,6 @@ with tab3:
         rtsp_url = st.text_input("请输入 RTSP 地址", placeholder="如 rtsp://admin:1234@192.168.5.30:8554/live")
 
     run_cam = st.checkbox("启用摄像头实时检测")
-    voice_on = st.checkbox("🔊 启用语音提示", value=True)
 
     FRAME_WINDOW = st.empty()
     tip_placeholder = st.empty()
@@ -695,10 +697,6 @@ with tab3:
             detector = st.session_state.model
             st.info("摄像头已启用，点击取消勾选以停止运行。")
 
-            # 使用 session_state 持久化 last_spoken_classes
-            if "last_spoken_classes" not in st.session_state:
-                st.session_state.last_spoken_classes = set()
-
             while run_cam:
                 ret, frame = cap.read()
                 if not ret:
@@ -713,27 +711,60 @@ with tab3:
                     device=detector.device
                 )
 
+                # 获取检测结果图像
                 result_img = results[0].plot()
                 result_rgb = cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB)
+
+                # 构建类别中文映射
+                chinese_map = {
+                    'recyclable waste': '可回收物',
+                    'hazardous waste': '有害垃圾',
+                    'kitchen waste': '厨余垃圾',
+                    'other waste': '其他垃圾'
+                }
+
+                # 获取当前帧中检测到的所有类别（去重）
+                detected_classes = []
+                if results[0].boxes:
+                    for box in results[0].boxes:
+                        class_id = int(box.cls.item())
+                        class_name = results[0].names[class_id]
+                        detected_classes.append(class_name)
+
+                    # 去重 & 保持顺序
+                    detected_classes = list(dict.fromkeys(detected_classes))
+                    chinese_labels = [chinese_map.get(name, name) for name in detected_classes]
+                else:
+                    chinese_labels = ['未检测到目标']
+
+                # 转换为 PIL 图像进行中文绘制
+                img_pil = Image.fromarray(result_rgb)
+                draw = ImageDraw.Draw(img_pil)
+                font_path = "font/simhei.ttf"  # 请确保这个字体存在
+                font = ImageFont.truetype(font_path, 18)
+
+                # 起始位置（右上角）
+                x = result_rgb.shape[1] - 200
+                y = 10
+
+                # 绘制标题
+                draw.text((x, y), "当前类别：", font=font, fill=(255, 0, 0))
+                x += 80
+
+                # 依次绘制每个类别
+                for label in chinese_labels:
+                    draw.text((x, y), f"{label}", font=font, fill=(255, 0, 0))
+                    y += 22  # 行间距
+
+                # 转换回 OpenCV 图像
+                result_rgb = np.array(img_pil)
+
+                # 显示图像
                 FRAME_WINDOW.image(result_rgb)
 
                 detected_classes = [detector.model.names[int(box.cls)] for box in results[0].boxes]
                 current_classes = set(detected_classes)
 
-                # 动态更新语音提示状态
-                if "last_spoken_classes" not in st.session_state:
-                    st.session_state.last_spoken_classes = set()
-
-                new_classes = current_classes - st.session_state.last_spoken_classes
-                removed_classes = st.session_state.last_spoken_classes - current_classes
-
-                # 播报新出现的类别
-                if voice_on and new_classes:
-                    for cls in new_classes:
-                        speak_trash_tip(TRASH_HINTS[cls]["tip"])
-
-                # 实时更新当前检测状态
-                st.session_state.last_spoken_classes = current_classes.copy()
 
                 # 显示提示信息
                 tip_texts = [f"**{cls}** → {TRASH_HINTS[cls]['color']}" for cls in current_classes]
