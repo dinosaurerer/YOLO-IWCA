@@ -18,7 +18,7 @@
 
 ## 🖼️ 系统界面预览
 
-<img src="screenshots/s1.png" width="100%" alt="系统主界面">
+<img src="screenshots/s2.png" width="100%" alt="系统主界面">
 
 ## 🌍 实际场景应用
 
