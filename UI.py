@@ -99,7 +99,9 @@ def verify_user(username, password):
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         cursor = conn.cursor()
-        cursor.execute("SELECT password, is_admin FROM users WHERE username = %s", (username,))
+        cursor.execute("SELECT password, "
+                       "is_admin FROM users WHERE username = %s",
+                       (username,))
         result = cursor.fetchone()
         if result and result[0] == password:
             return {"is_admin": result[1]}
